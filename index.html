@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Escape Room: La Torre Perdida</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23111'/%3E%3Ctext x='50' y='72' font-size='64' text-anchor='middle'%3E%F0%9F%8F%B0%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23111'/%3E%3Ctext x='50' y='72' font-size='64' text-anchor='middle'%3E%F0%9F%8F%B0%3C/text%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-tap-highlight-color:transparent}
+body{background:#111;color:#fff;font-family:'Courier New',Courier,monospace;display:flex;justify-content:center;align-items:center;height:100vh;height:100dvh;overflow:hidden}
+#game-container{width:100%;max-width:480px;height:100%;max-height:850px;background:#1a1a1a;display:flex;flex-direction:column;border:2px solid #333;position:relative}
+header{background:#000;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #444}
+.header-info h1{font-size:.9rem;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+#nivel{font-size:.75rem;color:#888;margin-top:2px}
+#menu-controls{display:flex;gap:5px}
+#menu-controls button{background:#333;color:#fff;border:1px solid #555;padding:5px 7px;cursor:pointer;font-size:.8rem}
+@keyframes parpadeo{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes entrada{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+#room-view{flex:1;position:relative;background:#151515;overflow:hidden;touch-action:none;animation:parpadeo 8s infinite;transition:background .5s ease}
+.transicion{animation:entrada 1s ease !important}
+#flashlight-overlay{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle 130px at 50% 50%,rgba(0,0,0,0) 0%,rgba(0,0,0,.95) 100%);z-index:2}
+.interactive-object{position:absolute;font-size:2.3rem;cursor:pointer;padding:10px;z-index:1;transition:transform .2s}
+.interactive-object:active{transform:scale(1.15)}
+footer{background:#000;padding:12px 15px;border-top:2px solid #444;display:flex;justify-content:space-between;align-items:center}
+footer h2{font-size:.8rem;margin-bottom:5px;color:#888}
+#inventory-slots{display:flex;gap:8px}
+.slot{width:50px;height:50px;background:#222;border:2px dashed #444;display:flex;justify-content:center;align-items:center;font-size:1.5rem}
+.hidden{display:none !important}
+#screen-inicio,#modal,#modal-candado,#modal-victoria,#modal-mapa{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;justify-content:center;align-items:center;z-index:10}
+.modal-content{background:#222;padding:25px;border:2px solid #666;text-align:center;width:85%;max-width:340px}
+.modal-content button,.btn-inicio{margin-top:15px;padding:10px 20px;background:#444;color:#fff;border:1px solid #777;cursor:pointer;font-family:inherit;font-size:1rem}
+.modal-content button:hover,.btn-inicio:hover{background:#666}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}
+.keypad button{padding:12px;font-size:1.2rem;background:#333;margin-top:0}
+.keypad button:active{background:#555}
+#display-codigo{font-size:1.5rem;letter-spacing:5px;margin:10px 0;color:#4CAF50}
+.lista-mapa{text-align:left;margin:15px 0;font-size:.9rem;line-height:1.6}
+@media(max-width:600px){#game-container{border:none}.interactive-object{font-size:2rem}}
+</style>
+</head>
+<body>
+
+<div id="screen-inicio">
+  <div class="modal-content">
+    <h1 style="font-size:1.3rem;margin-bottom:15px;letter-spacing:2px">🏰 LA TORRE PERDIDA</h1>
+    <p style="color:#aaa;line-height:1.5;margin-bottom:20px">5 pisos únicos...<br>Acertijos dinámicos...<br>Tienes 3 intentos por piso.<br>¿Podrás escapar?</p>
+    <button class="btn-inicio" onclick="comenzarJuego()">[ COMENZAR ]</button>
+  </div>
+</div>
+
+<div id="game-container">
+  <header>
+    <div class="header-info">
+      <h1 id="titulo-habitacion">Piso 1: Habitación 13</h1>
+      <div id="nivel">Piso 1/5</div>
+    </div>
+    <div id="menu-controls">
+      <button onclick="toggleMapa()">🗺️</button>
+      <button onclick="togglePistas()">💡</button>
+      <button onclick="toggleMenu()">ESC</button>
+    </div>
+  </header>
+  <main id="room-view">
+    <div id="flashlight-overlay"></div>
+    <div id="objetos-contenedor"></div>
+  </main>
+  <footer>
+    <div>
+      <h2>INVENTARIO</h2>
+      <div id="inventory-slots"><div class="slot" id="slot-0"></div><div class="slot" id="slot-1"></div></div>
+    </div>
+    <div style="text-align:right">
+      <div style="color:#888;font-size:.75rem;margin-bottom:3px">VIDAS</div>
+      <div id="vidas-texto" style="font-size:1.2rem;font-weight:bold">❤️❤️❤️</div>
+    </div>
+  </footer>
+</div>
+
+<div id="modal" class="hidden"><div class="modal-content"><p id="modal-text"></p><button onclick="cerrarModal()">Cerrar</button></div></div>
+
+<div id="modal-mapa" class="hidden"><div class="modal-content"><h3>🗺️ MAPA DE LA TORRE</h3><div id="lista-pisos-mapa" class="lista-mapa"></div><button onclick="cerrarMapa()">Cerrar</button></div></div>
+
+<div id="modal-candado" class="hidden">
+  <div class="modal-content">
+    <h3>🔒 MECANISMO DE BLOQUEO</h3>
+    <p id="display-codigo">_ _ _ _</p>
+    <div class="keypad">
+      <button onclick="ingresarDigito(1)">1</button><button onclick="ingresarDigito(2)">2</button><button onclick="ingresarDigito(3)">3</button>
+      <button onclick="ingresarDigito(4)">4</button><button onclick="ingresarDigito(5)">5</button><button onclick="ingresarDigito(6)">6</button>
+      <button onclick="ingresarDigito(7)">7</button><button onclick="ingresarDigito(8)">8</button><button onclick="ingresarDigito(9)">9</button>
+      <button onclick="borrarDigito()">⌫</button><button onclick="ingresarDigito(0)">0</button><button onclick="verificarCandado()">✔️</button>
+    </div>
+    <br><button onclick="cerrarModalCandado()">Cerrar</button>
+  </div>
+</div>
+
+<div id="modal-victoria" class="hidden">
+  <div class="modal-content">
+    <h2 style="color:#4CAF50;margin-bottom:10px">🏆 RESULTADO FINAL</h2>
+    <p id="stats-tiempo" style="margin:6px 0;color:#ccc"></p>
+    <p id="stats-pisos" style="margin:6px 0;color:#ccc"></p>
+    <p id="stats-pistas" style="margin:6px 0;color:#ccc"></p>
+    <p id="stats-rango" style="margin:12px 0;color:#ffeb3b;font-weight:bold;font-size:1.1rem"></p>
+    <button onclick="location.reload()">[REINICIAR]</button>
+  </div>
+</div>
+
+<script>
+// Pon en false para desactivar el código de pruebas 1313
+const MODO_TESTER = true;
+
+const gameState = { habitacionActual:1, totalHabitaciones:5, codigoSecreto:"", inventario:[], llaveEncontrada:false,
+  pistasUsadas:0, tiempoInicio:null, intentos:3, pisosSuperados:[false,false,false,false,false] };
+
+// Datos de cada piso: [emoji, posición, texto(c)] en orden: pista1, pista2, llave, candado, puerta
+const PISOS = {
+  1:{nombre:"Piso 1: Habitación 13",fondo:"#151515",objs:[
+    ["🖼️","top:15%;left:15%",c=>`El cuadro antiguo muestra una vieja torre. Una placa dorada indica que se construyó en el año 199${c[0]}. El último dígito brilla con fuerza.`],
+    ["🕰️","bottom:30%;right:15%",c=>`El reloj de pared hace tic-tac. Su segundero se ha trabado sobre el número ${c[1]}.`],
+    ["📚","bottom:25%;left:15%",c=>`Revisas los tomos empolvados. ¡Encuentras una 🔑 Llave oculta y un papel que dice: "Dígitos finales: ${c[2]}${c[3]}"!`],
+    ["🔒","top:20%;right:20%","Un candado mecánico de combinación de 4 dígitos."],
+    ["🚪","bottom:10%;left:45%","La puerta blindada de salida del Piso 1."]]},
+  2:{nombre:"Piso 2: Sótano Oscuro",fondo:"#080808",objs:[
+    ["📜","top:18%;left:20%",c=>`Una nota rasgada: "El primer dígito del sistema de seguridad es el ${c[0]}".`],
+    ["⛓️","bottom:30%;left:15%",c=>`Cadenas industriales heladas. Tienen grabado el número ${c[1]} en un eslabón.`],
+    ["🛢️","bottom:25%;right:20%",c=>`Mueves el pesado barril. ¡Debajo hay una 🔑 Llave y un registro borroso con los números finales: ${c[2]} y ${c[3]}!`],
+    ["🗄️","top:20%;right:25%","Una caja fuerte industrial con teclado electrónico."],
+    ["🚪","bottom:10%;left:45%","Reja de desfogue del sótano."]]},
+  3:{nombre:"Piso 3: Laboratorio",fondo:"#102020",objs:[
+    ["🔬","top:15%;right:20%",c=>`Por el microscopio ves bacterias alineadas formando el número ${c[0]}.`],
+    ["🧪","bottom:30%;left:20%",c=>`Entre los tubos de ensayo, uno tiene una etiqueta roja con el número ${c[1]}.`],
+    ["⚗️","bottom:25%;right:15%",c=>`Desplazas la probeta con cuidado. ¡Consigues una 🔑 Llave y una fórmula que termina en: ${c[2]}${c[3]}!`],
+    ["🎛️","top:22%;left:15%","Panel de control químico digital."],
+    ["🚪","bottom:10%;left:45%","Puerta de contención del laboratorio."]]},
+  4:{nombre:"Piso 4: Biblioteca Prohibida",fondo:"#201510",objs:[
+    ["📖","top:15%;left:15%",c=>`El atril sostiene un atlas estelar. Hay una constelación marcada con ${c[0]} estrellas brillantes.`],
+    ["🌌","bottom:30%;right:20%",c=>`Una esfera armilar apunta firmemente a la coordenada estelar número ${c[1]}.`],
+    ["📜","bottom:25%;left:15%",c=>`Desenrollas el pergamino sellado con cera. ¡Dentro hay una 🔑 Llave y la combinación final: ${c[2]}${c[3]}!`],
+    ["📘","top:20%;right:25%","Cerradura arcana protegida por runas estelares."],
+    ["🚪","bottom:10%;left:45%","Acceso secreto hacia la cúspide de la torre."]]},
+  5:{nombre:"Piso 5: Sala del Creador",fondo:"#001020",objs:[
+    ["📽️","top:15%;left:15%",c=>`El proyector holográfico muestra esquemas del núcleo. El sector principal indica el dígito: ${c[0]}.`],
+    ["🖥️","bottom:30%;right:15%",c=>`La terminal parpadea con una alerta con el número de seguridad: ${c[1]}.`],
+    ["💾","bottom:25%;left:20%",c=>`Abres el compartimento del servidor. ¡Recuperas la 🔑 Llave Maestra y el respaldo final con los dígitos ${c[2]}${c[3]}!`],
+    ["🔐","top:20%;right:25%","Terminal cuántica de desbloqueo final del edificio."],
+    ["🚪","bottom:10%;left:45%","Salida principal al exterior de la torre."]]}
+};
+const TIPOS = ["pista1","pista2","llave","candado","puerta"];
+
+let objetosPiso = [];
+let codigoIngresado = "";
+const $ = id => document.getElementById(id);
+
+function iniciarHabitacion(n) {
+  Object.assign(gameState, { habitacionActual:n, llaveEncontrada:false, inventario:[], intentos:3,
+    codigoSecreto:String(Math.floor(1000 + Math.random()*9000)) });
+  actualizarUIInventario();
+  actualizarUIVidas();
+
+  const rv = $("room-view");
+  rv.classList.add("transicion");
+  setTimeout(() => rv.classList.remove("transicion"), 1000);
+
+  const piso = PISOS[n], c = gameState.codigoSecreto;
+  $("titulo-habitacion").innerText = piso.nombre;
+  $("nivel").innerText = `Piso ${n}/5`;
+  rv.style.background = piso.fondo;
+
+  objetosPiso = piso.objs.map(([emoji, pos, txt], i) => ({
+    tipo: TIPOS[i], emoji, estilo: pos, encontrado: false, texto: typeof txt === "function" ? txt(c) : txt
+  }));
+  renderizarObjetos();
+}
+
+function renderizarObjetos() {
+  const cont = $("objetos-contenedor");
+  cont.innerHTML = "";
+  objetosPiso.forEach((obj, i) => {
+    if (obj.encontrado) return;
+    const div = document.createElement("div");
+    div.className = "interactive-object";
+    div.style.cssText = obj.estilo;
+    div.textContent = obj.emoji;
+    div.onclick = () => examinarObjeto(i);
+    cont.appendChild(div);
+  });
+}
+
+function comenzarJuego() {
+  $("screen-inicio").classList.add("hidden");
+  const audio = $("ambiente");
+  if (audio && audio.src) audio.play().catch(() => {});
+  gameState.tiempoInicio = Date.now();
+  iniciarHabitacion(1);
+}
+
+// --- Linterna ---
+const roomView = $("room-view"), flashlight = $("flashlight-overlay");
+function actualizarLinterna(x, y) {
+  const r = roomView.getBoundingClientRect();
+  flashlight.style.background = `radial-gradient(circle 130px at ${x - r.left}px ${y - r.top}px, rgba(0,0,0,0) 0%, rgba(0,0,0,.95) 100%)`;
+}
+roomView.addEventListener("mousemove", e => actualizarLinterna(e.clientX, e.clientY));
+["touchstart","touchmove"].forEach(ev => roomView.addEventListener(ev, e => {
+  const t = e.touches[0]; if (t) actualizarLinterna(t.clientX, t.clientY);
+}, { passive: true }));
+
+// --- Objetos ---
+function mostrarModal(txt) { $("modal-text").innerText = txt; $("modal").classList.remove("hidden"); }
+
+function examinarObjeto(i) {
+  const o = objetosPiso[i];
+  if (o.tipo === "llave") {
+    gameState.llaveEncontrada = true;
+    agregarInventario("🔑");
+    o.encontrado = true;
+    renderizarObjetos();
+    mostrarModal(o.texto + " ¡Has obtenido la llave!");
+  } else if (o.tipo === "candado") {
+    if (!gameState.llaveEncontrada) return mostrarModal("Necesitas encontrar la llave de este piso antes de manipular este mecanismo.");
+    codigoIngresado = "";
+    actualizarDisplayCandado();
+    $("modal-candado").classList.remove("hidden");
+  } else if (o.tipo === "puerta") {
+    mostrarModal(gameState.llaveEncontrada
+      ? "La puerta está lista para abrirse. Toca el mecanismo de seguridad para introducir el código secreto."
+      : "La puerta está cerrada con pasadores de seguridad. ¡Explora el piso!");
+  } else {
+    mostrarModal(o.texto);
+  }
+}
+
+// --- Inventario y vidas ---
+function agregarInventario(item) {
+  if (!gameState.inventario.includes(item)) { gameState.inventario.push(item); actualizarUIInventario(); }
+}
+function actualizarUIInventario() {
+  for (let i = 0; i < 2; i++) $(`slot-${i}`).textContent = gameState.inventario[i] || "";
+}
+function actualizarUIVidas() { $("vidas-texto").innerText = "❤️".repeat(gameState.intentos) || "❌"; }
+
+// --- Candado ---
+function ingresarDigito(d) {
+  if (codigoIngresado.length < 4) { codigoIngresado += d; actualizarDisplayCandado(); }
+}
+function borrarDigito() { codigoIngresado = codigoIngresado.slice(0, -1); actualizarDisplayCandado(); }
+function actualizarDisplayCandado() { $("display-codigo").innerText = codigoIngresado.padEnd(4, "_").split("").join(" "); }
+
+function mostrarVictoria(rangoForzado) {
+  const t = Math.floor((Date.now() - gameState.tiempoInicio) / 1000);
+  const mm = String(Math.floor(t / 60)).padStart(2, "0"), ss = String(t % 60).padStart(2, "0");
+  let rango = "Explorador";
+  if (t < 300) rango = "⭐ Leyenda del Escape"; else if (t < 600) rango = "🌟 Maestro del Escape";
+  $("stats-tiempo").innerText = `Tiempo total: ${mm}:${ss}`;
+  $("stats-pisos").innerText = "Pisos completados: 5/5";
+  $("stats-pistas").innerText = `Pistas usadas: ${gameState.pistasUsadas}`;
+  $("stats-rango").innerText = `Rango: ${rangoForzado || rango}`;
+  $("modal-victoria").classList.remove("hidden");
+}
+
+function verificarCandado() {
+  if (codigoIngresado.length !== 4) return alert("Introduce los 4 dígitos completos.");
+
+  const tester = MODO_TESTER && codigoIngresado === "1313";
+  if (tester || codigoIngresado === gameState.codigoSecreto) {
+    $("modal-candado").classList.add("hidden");
+    gameState.pisosSuperados[gameState.habitacionActual - 1] = true;
+    if (gameState.habitacionActual < gameState.totalHabitaciones) {
+      alert(tester ? "🛠️ [MODO TESTER] Código 1313 aceptado. Saltando al siguiente piso..."
+                   : `🎉 ¡Excelente! Has superado el ${PISOS[gameState.habitacionActual].nombre}. Avanzando al siguiente piso...`);
+      iniciarHabitacion(gameState.habitacionActual + 1);
+    } else {
+      mostrarVictoria(tester ? "⭐ Modo Tester (1313)" : null);
+    }
+    return;
+  }
+
+  gameState.intentos--;
+  actualizarUIVidas();
+  if (gameState.intentos <= 0) {
+    alert("🚨 ALARMA ACTIVADA\n\nTe has quedado sin intentos. La torre se reinicia por seguridad.");
+    location.reload();
+  } else {
+    alert(`❌ Código incorrecto. Intentos restantes: ${gameState.intentos}`);
+    codigoIngresado = "";
+    actualizarDisplayCandado();
+  }
+}
+
+function cerrarModalCandado() { $("modal-candado").classList.add("hidden"); }
+
+// --- Mapa, modales y menú ---
+function toggleMapa() {
+  $("lista-pisos-mapa").innerHTML = [1,2,3,4,5].map(i =>
+    `${gameState.pisosSuperados[i-1] ? "☑" : "☐"} ${PISOS[i].nombre}`).join("<br>");
+  $("modal-mapa").classList.remove("hidden");
+}
+function cerrarMapa() { $("modal-mapa").classList.add("hidden"); }
+function cerrarModal() { $("modal").classList.add("hidden"); }
+
+function togglePistas() {
+  gameState.pistasUsadas++;
+  const extra = MODO_TESTER ? " (Modo pruebas: usa <b>1313</b> en cualquier candado)." : "";
+  $("modal-text").innerHTML = `💡 <b>Pista del Piso ${gameState.habitacionActual}:</b> Mueve la linterna y examina los objetos. Necesitas 2 pistas sueltas y la llave, que guarda los dos últimos dígitos.${extra}`;
+  $("modal").classList.remove("hidden");
+}
+
+function toggleMenu() {
+  if (confirm("¿Deseas reiniciar la partida? Se perderá tu progreso actual.")) location.reload();
+}
+
+// --- Teclado (PC) ---
+window.addEventListener("keydown", e => {
+  if (!$("screen-inicio").classList.contains("hidden")) return;
+  if (!$("modal-candado").classList.contains("hidden")) {
+    if (/^[0-9]$/.test(e.key)) return ingresarDigito(e.key);
+    if (e.key === "Backspace") return borrarDigito();
+    if (e.key === "Enter") return verificarCandado();
+  }
+  if (e.key === "Escape") {
+    const abiertos = ["modal-candado","modal-mapa","modal"].filter(id => !$(id).classList.contains("hidden"));
+    if (abiertos.length) return abiertos.forEach(id => $(id).classList.add("hidden"));
+    return toggleMenu();
+  }
+  if (e.key.toLowerCase() === "m") toggleMapa();
+  if (e.key.toLowerCase() === "h") togglePistas();
+});
+</script>
+</body>
+</html>
